@@ -35,10 +35,10 @@ Before using SimplePHPDB, make sure you have the following:
 
 1. Clone or download this repository to your project directory.
 
-2. Include the `DB.php` class in your PHP script:
+2. Include the `config.php` class in your PHP script:
 
 ```php
-require 'DB.php';
+require 'config.php';
 // Create a new DB instance
 $db = new DB();
 ```
