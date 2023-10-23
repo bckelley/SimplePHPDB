@@ -115,8 +115,38 @@ class DB extends DBCONFIG
             $sql .= ' LIMIT ' . $conditions['limit'];
         }
 
-        $query = $this->db->query($sql);
+        $query = $this->db->prepare($sql);
 
+        if ($query) {
+            if (!empty($values)) {
+                $types = str_repeat('s', count($values));
+                $query->bind_param($types, ...$values);
+            }
+
+            $query->execute();
+            $result = $query->get_result();
+
+            if (array_key_exists("return_type", $conditions) && $conditions['return_type'] != 'all') {
+                switch ($conditions['return_type']) {
+                    case 'count':
+                        $data = $result->num_rows;
+                        break;
+                    case 'single':
+                        $data = $result->fetch_assoc();
+                        break;
+                    default:
+                        $data = '';
+                }
+            } else {
+                $data = $result->fetch_all(MYSQLI_ASSOC);
+            }
+            
+            $query->close();
+            return !empty($data) ? $data : false;
+        } else {
+            return false;
+        }
+/*
         if (array_key_exists("return_type", $conditions) && $conditions['return_type'] != 'all') {
             switch ($conditions['return_type']) {
                 case 'count':
@@ -136,6 +166,7 @@ class DB extends DBCONFIG
             }
         }
         return !empty($data) ? $data : false;
+*/
     }
 
     /**
