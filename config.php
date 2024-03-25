@@ -2,10 +2,10 @@
 
 
 class DBCONFIG {
-    private $dbHost     = "localhost";
+    private $dbHost     = "mariadb";
     private $dbUsername = "root";
-    private $dbPassword = "";
-    private $dbName     = "";
+    private $dbPassword = "root";
+    private $dbName     = "accounts";
 
     private $dbconfig;
 
@@ -18,7 +18,7 @@ class DBCONFIG {
 
         if (!isset($this->dbconfig)) {
 
-            $conn = new mysqli($this->dbHost, $this->dbUsername, $this->dbPassword, $this->dbName);
+            $conn = new mysqli($this->dbHost, $this->dbUsername, $this->dbPassword);
 
             $errno = $conn->connect_errno;
             $error = $conn->connect_error;
@@ -35,8 +35,82 @@ class DBCONFIG {
                     die("Error: [ " . $errno . " ] " . $error);
                 }
             }
+
+            // Directory containing SQL files
+            $sqlDir = './sql';
+
+            // Get all SQL files in the directory
+            $tblFiles = glob("$sqlDir/*.sql");
+
+            // Find the file containing alter commands
+            $alterFile = null;
+            foreach ($tblFiles as $path) {
+                $sql = file_get_contents($path);
+                if (stripos($sql, 'ALTER TABLE') !== false) {
+                    $alterFile = $path;
+                    break;
+                }
+            }
+
+            // If no specific alter file found, execute in default order
+            if ($alterFile === null) {
+                $tblFiles = array_filter($tblFiles, function($file) {
+                    return basename($file) !== 'alters.sql';
+                });
+            } else {
+                // Remove the specific alter file from the list
+                $tblFiles = array_diff($tblFiles, [$alterFile]);
+            }
+
+            // Create the database if it doesn't exist
+            $sql = "CREATE DATABASE IF NOT EXISTS " . $this->dbName . " CHARACTER SET utf8 COLLATE utf8_unicode_ci";
+            if ($this->dbconfig->query($sql) === TRUE) {
+                echo "Database created successfully.\n";
+
+                // Select the database
+                if (!$this->dbconfig->select_db($this->dbName)) {
+                    echo "Error selecting database: " . $db->error;
+                    die(); // If errors we always die!
+                }
+
+                echo "Database selected successfully";
+
+                // Execute non-alter files first
+                foreach ($tblFiles as $path) { 
+                    executeSqlFile($db, $path);
+                }
+
+                // Execute alter file last if found
+                if ($alterFile !== null) {
+                    executeSqlFile($db, $alterFile);
+                }
+            } else {
+                echo "Error creating database: " . $db->error;
+                die(); // If errors we always die!
+            }
+
         }
         return $this->dbconfig;
+    }
+
+    function executeSqlFile($db, $path) {
+        // Read the SQL file
+        $sql = file_get_contents($path);
+    
+        // Separate SQL queries
+        $queries = explode(';', $sql);
+    
+        // Execute each query separately
+        foreach ($queries as $query) {
+            if (!empty(trim($query))) {
+                if ($db->query($query) === TRUE) {
+                    echo "Query executed successfully.\n";
+                } else {
+                    echo "Error executing query: " . $db->error;
+                    die(); // If errors we always die!
+                }
+            }
+        }
     }
 }
 
@@ -44,6 +118,7 @@ class DBCONFIG {
  * DB Class 
  * This class is used for database related (connect, insert, update, and delete) operations 
  */
+
 class DB extends DBCONFIG {
     private $db;
 
