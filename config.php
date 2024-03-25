@@ -1,8 +1,7 @@
 <?php
 
 
-class DBCONFIG
-{
+class DBCONFIG {
     private $dbHost     = "localhost";
     private $dbUsername = "root";
     private $dbPassword = "";
@@ -10,8 +9,7 @@ class DBCONFIG
 
     private $dbconfig;
 
-    public function __construct()
-    {
+    public function __construct() {
         define('DEV_MODE', true);
         ini_set('display_errors', DEV_MODE ? 1 : 0);
         ini_set('display_startup_errors', DEV_MODE ? 1 : 0);
@@ -46,16 +44,13 @@ class DBCONFIG
  * DB Class 
  * This class is used for database related (connect, insert, update, and delete) operations 
  */
-class DB extends DBCONFIG
-{
+class DB extends DBCONFIG {
     private $db;
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->db = parent::__construct();
     }
-    public function __destruct()
-    {
+    public function __destruct() {
         if ($this->db !== null) {
             $this->db = null;
         }
@@ -66,8 +61,7 @@ class DB extends DBCONFIG
      * @param string name of the table 
      * @param array select, where, order_by, limit and return_type conditions 
      */
-    public function getRows($table, $conditions = array())
-    {
+    public function getRows($table, $conditions = array()) {
         $sql = 'SELECT ';
         $sql .= array_key_exists("select", $conditions) ? $conditions['select'] : '*';
         $sql .= ' FROM ' . $table;
@@ -174,8 +168,7 @@ class DB extends DBCONFIG
      * @param string name of the table 
      * @param array the data for inserting into the table 
      */
-    public function insert($table, $data)
-    {
+    public function insert($table, $data) {
         if (!empty($data) && is_array($data)) {
             $columns = '';
             $values  = '';
@@ -210,8 +203,7 @@ class DB extends DBCONFIG
      * @param array the data for updating into the table 
      * @param array where condition on updating data 
      */
-    public function update($table, $data, $conditions)
-    {
+    public function update($table, $data, $conditions) {
         if (!empty($data) && is_array($data)) {
             $colvalSet = '';
             $whereSql = '';
@@ -247,8 +239,7 @@ class DB extends DBCONFIG
      * @param string name of the table 
      * @param array where condition on deleting data 
      */
-    public function delete($table, $conditions)
-    {
+    public function delete($table, $conditions) {
         $whereSql = '';
         if (!empty($conditions) && is_array($conditions)) {
             $whereSql .= ' WHERE ';
