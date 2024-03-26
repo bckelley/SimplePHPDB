@@ -16,103 +16,86 @@ class DBCONFIG {
         ini_set('log_errors', DEV_MODE ? 0 : 1);
         DEV_MODE ? error_reporting(E_ALL & ~E_NOTICE) : error_reporting(0);
 
-        if (!isset($this->dbconfig)) {
+        $this->dbconfig = $this->connectDB();
 
-            $conn = new mysqli($this->dbHost, $this->dbUsername, $this->dbPassword);
+        // Create and select database
+        $this->createAndSelectDatabase();
 
-            $errno = $conn->connect_errno;
-            $error = $conn->connect_error;
+        // Execute SQL files
+        $this->executeSQLFiles();
 
-            if ($errno) {
-                echo "Error: [ " . $errno . " ] " . $error;
-            } elseif (!$errno) {
-                $this->dbconfig = $conn;
-            } else {
-                if (!DEV_MODE) {
-                    error_log("[ " . date('m-d-Y H:i:s') . " ]: #" . $errno . " : " . $error . PHP_EOL, 3, 'errors/error_log.log');
-                    // TODO: Email to email messages
-                } else {
-                    die("Error: [ " . $errno . " ] " . $error);
-                }
-            }
-
-            // Directory containing SQL files
-            $sqlDir = './sql';
-
-            // Get all SQL files in the directory
-            $tblFiles = glob("$sqlDir/*.sql");
-
-            // Find the file containing alter commands
-            $alterFile = null;
-            foreach ($tblFiles as $path) {
-                $sql = file_get_contents($path);
-                if (stripos($sql, 'ALTER TABLE') !== false) {
-                    $alterFile = $path;
-                    break;
-                }
-            }
-
-            // If no specific alter file found, execute in default order
-            if ($alterFile === null) {
-                $tblFiles = array_filter($tblFiles, function($file) {
-                    return basename($file) !== 'alters.sql';
-                });
-            } else {
-                // Remove the specific alter file from the list
-                $tblFiles = array_diff($tblFiles, [$alterFile]);
-            }
-
-            // Create the database if it doesn't exist
-            $sql = "CREATE DATABASE IF NOT EXISTS " . $this->dbName . " CHARACTER SET utf8 COLLATE utf8_unicode_ci";
-            if ($this->dbconfig->query($sql) === TRUE) {
-                echo "Database created successfully.\n";
-
-                // Select the database
-                if (!$this->dbconfig->select_db($this->dbName)) {
-                    echo "Error selecting database: " . $db->error;
-                    die(); // If errors we always die!
-                }
-
-                echo "Database selected successfully";
-
-                // Execute non-alter files first
-                foreach ($tblFiles as $path) { 
-                    executeSqlFile($db, $path);
-                }
-
-                // Execute alter file last if found
-                if ($alterFile !== null) {
-                    executeSqlFile($db, $alterFile);
-                }
-            } else {
-                echo "Error creating database: " . $db->error;
-                die(); // If errors we always die!
-            }
-
-        }
         return $this->dbconfig;
     }
 
-    function executeSqlFile($db, $path) {
+    private function connectDB() {
+        $conn = new mysqli($this->dbHost, $this->dbUsername, $this->dbPassword);
+        if ($conn->connect_errno) {
+            $this->handleError($conn->connect_errno, $conn->connect_error);
+        }
+        return $conn;
+    }
+
+    private function createAndSelectDatabase() {
+        $sql = "CREATE DATABASE IF NOT EXISTS " . $this->dbName . " CHARACTER SET utf8 COLLATE utf8_unicode_ci";
+        if (!$this->dbconfig->query($sql)) {
+            $this->handleError($this->dbconfig->errno, $this->dbconfig->error);
+        }
+        if (!$this->dbconfig->select_db($this->dbName)) {
+            $this->handleError($this->dbconfig->errno, $this->dbconfig->error);
+        }
+    }
+
+    private function executeSQLFiles() {
+        // Directory containing SQL files
+        $sqlDir = './sql';
+
+        // Get all SQL files in the directory
+        $tblFiles = glob("$sqlDir/*.sql");
+
+        // Execute non-alter files first
+        foreach ($tblFiles as $path) {
+            if (basename($path) !== 'alters.sql') {
+                $this->executeSqlFile($path);
+            }
+        }
+
+        // Execute alter file last if found
+        foreach ($tblFiles as $path) {
+            if (basename($path) === 'alters.sql') {
+                $this->executeSqlFile($path);
+            }
+        }
+    }
+
+    private function executeSqlFile($path) {
         // Read the SQL file
         $sql = file_get_contents($path);
-    
+
         // Separate SQL queries
         $queries = explode(';', $sql);
-    
+
         // Execute each query separately
         foreach ($queries as $query) {
             if (!empty(trim($query))) {
-                if ($db->query($query) === TRUE) {
-                    echo "Query executed successfully.\n";
-                } else {
-                    echo "Error executing query: " . $db->error;
-                    die(); // If errors we always die!
+                if (!$this->dbconfig->query($query)) {
+                    $this->handleError($this->dbconfig->errno, $this->dbconfig->error);
                 }
             }
         }
     }
+
+    private function handleError($errno, $error) {
+        if (DEV_MODE) {
+            die("Error: [ $errno ] $error");
+        } else {
+            error_log("[ " . date('m-d-Y H:i:s') . " ]: #$errno : $error" . PHP_EOL, 3, 'errors/error_log.log');
+            // TODO: Email error messages
+            die("An error occurred. Please try again later.");
+        }
+    }
 }
+
+
 
 /**
  * DB Class 
