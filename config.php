@@ -231,6 +231,7 @@ class DB extends DBCONFIG {
             $columns = '';
             $values  = '';
             $i = 0;
+        /*
             if (!array_key_exists('created', $data)) {
                 $data['created'] = date("Y-m-d H:i:s");
             }
@@ -240,7 +241,8 @@ class DB extends DBCONFIG {
             if (!array_key_exists('password', $data)) {
                 $data['password'] = $data;
             }
-
+        */
+        
             foreach ($data as $key => $val) {
                 $pre = ($i > 0) ? ', ' : '';
                 $columns .= $pre . $key;
