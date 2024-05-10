@@ -131,6 +131,30 @@ class DB extends DBCONFIG {
         $sql = 'SELECT ';
         $sql .= array_key_exists("select", $conditions) ? $conditions['select'] : '*';
         $sql .= ' FROM ' . $table;
+        if (array_key_exists("join_type", $conditions) && $conditions['join_type'] != 'join') {
+            switch ($conditions['join_type']) {
+                case 'inner':
+                    $sql .= ' INNER JOIN ';
+                    break;
+                case 'left':
+                    $sql .= ' LEFT JOIN ';
+                    break;
+                case 'right':
+                    $sql .= ' RIGHT JOIN ';
+                    break;
+                case 'full':
+                    $sql .= ' FULL JOIN ';
+                    break;
+                case 'self':
+                    $sql .= ' SELF JOIN ';
+                    break;
+                default:
+                    $sql .= ' JOIN ';
+                    break;
+            }
+            $sql .= $conditions['join_type']['table'];
+            $sql .= ' ON ' . $conditions['join_type']['condition'];
+        }
         if (array_key_exists("where", $conditions)) {
             $sql .= ' WHERE ';
             $i = 0;
