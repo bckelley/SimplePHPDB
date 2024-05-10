@@ -16,13 +16,17 @@ class DBCONFIG {
         ini_set('log_errors', DEV_MODE ? 0 : 1);
         DEV_MODE ? error_reporting(E_ALL & ~E_NOTICE) : error_reporting(0);
 
-        $this->dbconfig = $this->connectDB();
+        try {
+            $this->dbconfig = $this->connectDB();
 
-        // Create and select database
-        $this->createAndSelectDatabase();
+            // Create and select database
+            $this->createAndSelectDatabase();
 
-        // Execute SQL files
-        $this->executeSQLFiles();
+            // Execute SQL files
+            $this->executeSQLFiles();
+        } catch (Exception $err) {
+            $this->handleError($err->getCode(), $err->getMessage());
+        }
 
         return $this->dbconfig;
     }
@@ -30,7 +34,7 @@ class DBCONFIG {
     private function connectDB() {
         $conn = new mysqli($this->dbHost, $this->dbUsername, $this->dbPassword);
         if ($conn->connect_errno) {
-            $this->handleError($conn->connect_errno, $conn->connect_error);
+            throw new Exception($conn->connect_error, $conn->connect_errno);
         }
         return $conn;
     }
@@ -38,10 +42,10 @@ class DBCONFIG {
     private function createAndSelectDatabase() {
         $sql = "CREATE DATABASE IF NOT EXISTS " . $this->dbName . " CHARACTER SET utf8 COLLATE utf8_unicode_ci";
         if (!$this->dbconfig->query($sql)) {
-            $this->handleError($this->dbconfig->errno, $this->dbconfig->error);
+            throw new Exception($this->dbconfig->error, $this->dbconfig->errno);
         }
         if (!$this->dbconfig->select_db($this->dbName)) {
-            $this->handleError($this->dbconfig->errno, $this->dbconfig->error);
+            throw new Exception($this->dbconfig->error, $this->dbconfig->errno);
         }
     }
 
@@ -78,7 +82,7 @@ class DBCONFIG {
         foreach ($queries as $query) {
             if (!empty(trim($query))) {
                 if (!$this->dbconfig->query($query)) {
-                    $this->handleError($this->dbconfig->errno, $this->dbconfig->error);
+                    new Exception($this->dbconfig->error, $this->dbconfig->errno);
                 }
             }
         }
@@ -88,7 +92,7 @@ class DBCONFIG {
         if (DEV_MODE) {
             die("Error: [ $errno ] $error");
         } else {
-            error_log("[ " . date('m-d-Y H:i:s') . " ]: #$errno : $error" . PHP_EOL, 3, 'errors/error_log.log');
+            error_log("[ " . date('m-d-Y H:i:s') . " ]: $errno : $error" . PHP_EOL, 3, 'errors/error_log.log');
             // TODO: Email error messages
             die("An error occurred. Please try again later.");
         }
@@ -106,7 +110,11 @@ class DB extends DBCONFIG {
     private $db;
 
     public function __construct() {
-        $this->db = parent::__construct();
+        try {
+            $this->db = parent::__construct();
+        } catch (Exception $err) {
+            $this->handleError($err->getCode(), $err->getMessage());
+        }
     }
     public function __destruct() {
         if ($this->db !== null) {
@@ -167,38 +175,8 @@ class DB extends DBCONFIG {
             $sql .= ' LIMIT ' . $conditions['limit'];
         }
 
-        $query = $this->db->prepare($sql);
+        $query = $this->db->query($sql);
 
-        if ($query) {
-            if (!empty($values)) {
-                $types = str_repeat('s', count($values));
-                $query->bind_param($types, ...$values);
-            }
-
-            $query->execute();
-            $result = $query->get_result();
-
-            if (array_key_exists("return_type", $conditions) && $conditions['return_type'] != 'all') {
-                switch ($conditions['return_type']) {
-                    case 'count':
-                        $data = $result->num_rows;
-                        break;
-                    case 'single':
-                        $data = $result->fetch_assoc();
-                        break;
-                    default:
-                        $data = '';
-                }
-            } else {
-                $data = $result->fetch_all(MYSQLI_ASSOC);
-            }
-            
-            $query->close();
-            return !empty($data) ? $data : false;
-        } else {
-            return false;
-        }
-/*
         if (array_key_exists("return_type", $conditions) && $conditions['return_type'] != 'all') {
             switch ($conditions['return_type']) {
                 case 'count':
@@ -218,7 +196,6 @@ class DB extends DBCONFIG {
             }
         }
         return !empty($data) ? $data : false;
-*/
     }
 
     /**
@@ -242,7 +219,7 @@ class DB extends DBCONFIG {
                 $data['password'] = $data;
             }
         */
-        
+
             foreach ($data as $key => $val) {
                 $pre = ($i > 0) ? ', ' : '';
                 $columns .= $pre . $key;
