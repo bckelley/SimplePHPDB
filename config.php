@@ -1,11 +1,13 @@
 <?php
 
-
 class DBCONFIG {
+    use ErrorHandler;
+
     private $dbHost     = "";
     private $dbUsername = "";
     private $dbPassword = "";
     private $dbName     = "";
+    private $ErrorHandler;
 
     private $dbconfig;
 
@@ -25,7 +27,7 @@ class DBCONFIG {
             // Execute SQL files
             $this->executeSQLFiles();
         } catch (Exception $err) {
-            $this->handleError($err->getCode(), $err->getMessage());
+            $this->ErrorHandler->handleError($err->getCode(), $err->getMessage());
         }
 
         return $this->dbconfig;
@@ -87,33 +89,35 @@ class DBCONFIG {
             }
         }
     }
+}
 
-    private function handleError($errno, $error) {
+class ErrorHandler {
+    protected function handleError($errno, $error) {
         if (DEV_MODE) {
-            die("Error: [ $errno ] $error");
+            die("Error: [ " . $errno . " ]: " . $error . ".");
         } else {
-            error_log("[ " . date('m-d-Y H:i:s') . " ]: $errno : $error" . PHP_EOL, 3, 'errors/error_log.log');
+            // "[ date ] [errno]: error"
+            error_log("[ " . date('m-d-Y H:i:s') . " ] [" . $errno . "] " . $error . PHP_EOL, 3, 'errors/error_log.log');
             // TODO: Email error messages
             die("An error occurred. Please try again later.");
         }
     }
 }
 
-
-
 /**
  * DB Class 
  * This class is used for database related (connect, insert, update, and delete) operations 
  */
-
 class DB extends DBCONFIG {
+    use ErrorHandler;
     private $db;
-
+    private $ErrorHandler;
+    
     public function __construct() {
         try {
             $this->db = parent::__construct();
         } catch (Exception $err) {
-            $this->handleError($err->getCode(), $err->getMessage());
+            $this->ErrorHandler->handleError($err->getCode(), $err->getMessage());
         }
     }
     public function __destruct() {
