@@ -1,11 +1,25 @@
 <?php
 
-
+Trait ErrorHandler {
+    protected function handleError($errno, $error) {
+        if (DEV_MODE) {
+            die("Error: [ " . $errno . " ]: " . $error . ".");
+        } else {
+            // "[ date ] [errno]: error"
+            error_log("[ " . date('m-d-Y H:i:s') . " ] [" . $errno . "] " . $error . PHP_EOL, 3, 'errors/error_log.log');
+            // TODO: Email error messages
+            die("An error occurred. Please try again later.");
+        }
+    }
+}
 class DBCONFIG {
+    use ErrorHandler;
+
     private $dbHost     = "mariadb";
     private $dbUsername = "root";
     private $dbPassword = "root";
     private $dbName     = "accounts";
+    private $ErrorHandler;
 
     private $dbconfig;
 
@@ -105,15 +119,17 @@ class DBCONFIG {
  * DB Class 
  * This class is used for database related (connect, insert, update, and delete) operations 
  */
-
 class DB extends DBCONFIG {
+    use ErrorHandler;
+
     private $db;
+    private $ErrorHandler;
 
     public function __construct() {
         try {
             $this->db = parent::__construct();
         } catch (Exception $err) {
-            $this->handleError($err->getCode(), $err->getMessage());
+            $this->ErrorHandler->handleError($err->getCode(), $err->getMessage());
         }
     }
     public function __destruct() {
@@ -131,8 +147,12 @@ class DB extends DBCONFIG {
         $sql = 'SELECT ';
         $sql .= array_key_exists("select", $conditions) ? $conditions['select'] : '*';
         $sql .= ' FROM ' . $table;
-        if (array_key_exists("join_type", $conditions) && $conditions['join_type'] != 'join') {
-            switch ($conditions['join_type']) {
+
+        $values = [];
+        $types = '';
+
+        if (array_key_exists("join_type", $conditions) && isset($conditions['join_type']['table'], $conditions['join_type']['condition'])) {
+            switch ($conditions['join_type']['type']) {
                 case 'inner':
                     $sql .= ' INNER JOIN ';
                     break;
@@ -155,23 +175,26 @@ class DB extends DBCONFIG {
             $sql .= $conditions['join_type']['table'];
             $sql .= ' ON ' . $conditions['join_type']['condition'];
         }
-        if (array_key_exists("where", $conditions)) {
+
+        if (array_key_exists("where", $conditions) && is_array($conditions['where'])) {
             $sql .= ' WHERE ';
             $i = 0;
             foreach ($conditions['where'] as $key => $value) {
                 $pre = ($i > 0) ? ' AND ' : '';
-                $sql .= $pre . $key . " = '" . $value . "'";
+                $sql .= $pre . $key . ' = ?';
+                $values[] = $value;
                 $i++;
             }
         }
 
-        if (array_key_exists("like", $conditions) && !empty($conditions['like'])) {
+        if (array_key_exists("like", $conditions) && is_array($conditions['like'])) {
             $sql .= (strpos($sql, 'WHERE') !== FALSE) ? ' AND ' : ' WHERE ';
             $i = 0;
             $likeSQL = '';
             foreach ($conditions['like'] as $key => $value) {
                 $pre = ($i > 0) ? ' AND ' : '';
-                $likeSQL .= $pre . $key . " LIKE '%" . $value . "%'";
+                $likeSQL .= $pre . $key . " LIKE ?";
+                $values[] = "%$values%";
                 $i++;
             }
             $sql .= '(' . $likeSQL . ')';
@@ -183,7 +206,8 @@ class DB extends DBCONFIG {
             $likeSQL = '';
             foreach ($conditions['like_or'] as $key => $value) {
                 $pre = ($i > 0) ? ' OR ' : '';
-                $likeSQL .= $pre . $key . " LIKE '%" . $value . "%'";
+                $likeSQL .= $pre . $key . " LIKE ?";
+                $values[] = "%$value%";
                 $i++;
             }
             $sql .= '(' . $likeSQL . ')';
@@ -194,32 +218,60 @@ class DB extends DBCONFIG {
         }
 
         if (array_key_exists("start", $conditions) && array_key_exists("limit", $conditions)) {
-            $sql .= ' LIMIT ' . $conditions['start'] . ',' . $conditions['limit'];
+            $sql .= ' LIMIT ?, ?';
+            $values[] = $conditions['start'];
+            $values[] = $conditions['limit'];
         } elseif (!array_key_exists("start", $conditions) && array_key_exists("limit", $conditions)) {
-            $sql .= ' LIMIT ' . $conditions['limit'];
+            $sql .= ' LIMIT ?';
+            $values[] = $conditions['limit'];
         }
 
-        $query = $this->db->query($sql);
+        $stmt = $this->db->prepare($sql);
 
-        if (array_key_exists("return_type", $conditions) && $conditions['return_type'] != 'all') {
-            switch ($conditions['return_type']) {
-                case 'count':
-                    $data = $query->num_rows;
-                    break;
-                case 'single':
-                    $data = $query->fetch_assoc();
-                    break;
-                default:
-                    $data = '';
-            }
-        } else {
-            if ($query->num_rows > 0) {
-                while ($row = $query->fetch_assoc()) {
-                    $data[] = $row;
+        if ($stmt) {
+            // Create the type string dynamically
+            foreach ($values as $value) {
+                if (is_int($value)) {
+                    $types .= 'i';   
+                } elseif (is_float($value)) {
+                    $types .= 'd';
+                } elseif (is_string($value)) {
+                    $types .= 's';
+                } else {
+                    $types .= 'b';
                 }
             }
+
+            if (!empty($types)) {
+                $stmt->bind_param($types, ...$values);
+            }
+
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if (array_key_exists("return_type", $conditions) && $conditions['return_type'] != 'all') {
+                switch ($conditions['return_type']) {
+                    case 'count':
+                        return $result->num_rows;
+                        break;
+                    case 'single':
+                        return $result->fetch_assoc();
+                        break;
+                    default:
+                        return false;
+                }
+            } else {
+                $data = [];
+                if ($result->num_rows > 0) {
+                    while ($row = $result->fetch_assoc()) {
+                        $data[] = $row;
+                    }
+                }
+                return !empty($data) ? $data : false;
+            }
+        } else {
+            return false;
         }
-        return !empty($data) ? $data : false;
     }
 
     /**
@@ -229,33 +281,33 @@ class DB extends DBCONFIG {
      */
     public function insert($table, $data) {
         if (!empty($data) && is_array($data)) {
-            $columns = '';
-            $values  = '';
-            $i = 0;
-        /*
-            if (!array_key_exists('created', $data)) {
-                $data['created'] = date("Y-m-d H:i:s");
+            $columns = implode(", ", array_keys($data));
+            $placeholders = rtrim(str_repeat('?, ', count($data)), ', ');
+            $query = "INSERT INTO $table ($columns) VALUES ($placeholders)";
+            $stmt = $this->db->prepare($query);
+        
+            if ($stmt) {
+                $types = '';
+                $values= [];
+                foreach ($data as $value) {
+                    if (is_int($value)) {
+                        $types .= 'i';
+                    } elseif (is_float($value)) {
+                        $types .= 'd';
+                    } elseif (is_string($value)) {
+                        $types .= 's';
+                    } else {
+                        $types .= 'b';
+                    }
+                    $values[] = $value;
+                }
+                $stmt->bind_param($types, ...$values);
+                if ($stmt->execute()) {
+                    return $this->db->insert_id;
+                }
             }
-            if (!array_key_exists('modified', $data)) {
-                $data['modified'] = date("Y-m-d H:i:s");
-            }
-            if (!array_key_exists('password', $data)) {
-                $data['password'] = $data;
-            }
-        */
-
-            foreach ($data as $key => $val) {
-                $pre = ($i > 0) ? ', ' : '';
-                $columns .= $pre . $key;
-                $values  .= $pre . "'" . $this->db->real_escape_string($val) . "'";
-                $i++;
-            }
-            $query = "INSERT INTO " . $table . " (" . $columns . ") VALUES (" . $values . ")";
-            $insert = $this->db->query($query);
-            return $insert ? $this->db->insert_id : false;
-        } else {
-            return false;
         }
+        return false;
     }
 
     /**
@@ -302,17 +354,27 @@ class DB extends DBCONFIG {
      */
     public function delete($table, $conditions) {
         $whereSql = '';
+        $values = [];
+        
         if (!empty($conditions) && is_array($conditions)) {
             $whereSql .= ' WHERE ';
             $i = 0;
             foreach ($conditions as $key => $value) {
                 $pre = ($i > 0) ? ' AND ' : '';
-                $whereSql .= $pre . $key . " = '" . $value . "'";
+                $whereSql .= $pre . $key . ' = ?';
+                $values[] = $value;
                 $i++;
             }
         }
         $sql = "DELETE FROM " . $table . $whereSql;
-        $delete = $this->db->execute_query($sql);
-        return $delete ? $delete : false;
+        $stmt = $this->db->prepare($sql);
+
+        if ($stmt) {
+            $stmt->bind_param(str_repeat('s', count($values)), ...$values);
+            $stmt->execute();
+            return $stmt->affected_rows > 0;
+        } else {
+            return false;
+        }
     }
 }
