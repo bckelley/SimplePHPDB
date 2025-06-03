@@ -15,20 +15,27 @@ Trait ErrorHandler {
 class DBCONFIG {
     use ErrorHandler;
 
-    private $dbHost     = "mariadb";
-    private $dbUsername = "root";
-    private $dbPassword = "root";
-    private $dbName     = "accounts";
+    private $dbHost;
+    private $dbUsername;
+    private $dbPassword;
+    private $dbName;
+
     private $ErrorHandler;
 
     private $dbconfig;
 
-    public function __construct() {
+    public function __construct($dbHost, $dbUsername, $dbPassword, $dbName) {
         define('DEV_MODE', true);
         ini_set('display_errors', DEV_MODE ? 1 : 0);
         ini_set('display_startup_errors', DEV_MODE ? 1 : 0);
         ini_set('log_errors', DEV_MODE ? 0 : 1);
         DEV_MODE ? error_reporting(E_ALL & ~E_NOTICE) : error_reporting(0);
+
+        $this->dbHost     = $dbHost;
+        $this->dbUsername = $dbUsername;
+        $this->dbPassword = $dbPassword;
+        $this->dbName     = $dbName;
+
 
         try {
             $this->dbconfig = $this->connectDB();
@@ -125,9 +132,9 @@ class DB extends DBCONFIG {
     private $db;
     private $ErrorHandler;
 
-    public function __construct() {
+    public function __construct($dbHost, $dbUsername, $dbPassword, $dbName) {
         try {
-            $this->db = parent::__construct();
+            $this->db = parent::__construct($dbHost, $dbUsername, $dbPassword, $dbName);
         } catch (Exception $err) {
             $this->ErrorHandler->handleError($err->getCode(), $err->getMessage());
         }
