@@ -4,13 +4,13 @@ This directory contains SQL files for database setup. Users can also have one fi
 
 ## Files
 
-- `create_tables.sql`: Contains SQL commands for creating database tables.
-- `alter_tables.sql`: Contains SQL commands for altering database tables.
+- `create.sql`: Contains SQL commands for creating database tables.
+- `alters.sql`: Contains SQL commands for altering database tables.
 
 ## Execution Order
 
-1. **create_tables.sql**: This file contains SQL commands to create tables in the database.
-2. **alter_tables.sql**: This file contains SQL commands to alter existing tables in the database.
+1. **create.sql**: This file contains SQL commands to create tables in the database.
+2. **alter.sql**: This file contains SQL commands to alter existing tables in the database.
 
 ## Note
 

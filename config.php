@@ -12,13 +12,15 @@ Trait ErrorHandler {
         }
     }
 }
+
 class DBCONFIG {
     use ErrorHandler;
 
-    private $dbHost     = "mariadb";
-    private $dbUsername = "root";
-    private $dbPassword = "root";
-    private $dbName     = "accounts";
+    private $dbHost     = "";
+    private $dbUsername = "";
+    private $dbPassword = "";
+    private $dbName     = "";
+
     private $ErrorHandler;
 
     private $dbconfig;
@@ -39,7 +41,7 @@ class DBCONFIG {
             // Execute SQL files
             $this->executeSQLFiles();
         } catch (Exception $err) {
-            $this->handleError($err->getCode(), $err->getMessage());
+            $this->ErrorHandler->handleError($err->getCode(), $err->getMessage());
         }
 
         return $this->dbconfig;
@@ -101,19 +103,20 @@ class DBCONFIG {
             }
         }
     }
+}
 
-    private function handleError($errno, $error) {
+class ErrorHandler {
+    protected function handleError($errno, $error) {
         if (DEV_MODE) {
-            die("Error: [ $errno ] $error");
+            die("Error: [ " . $errno . " ]: " . $error . ".");
         } else {
-            error_log("[ " . date('m-d-Y H:i:s') . " ]: $errno : $error" . PHP_EOL, 3, 'errors/error_log.log');
+            // "[ date ] [errno]: error"
+            error_log("[ " . date('m-d-Y H:i:s') . " ] [" . $errno . "] " . $error . PHP_EOL, 3, 'errors/error_log.log');
             // TODO: Email error messages
             die("An error occurred. Please try again later.");
         }
     }
 }
-
-
 
 /**
  * DB Class 
