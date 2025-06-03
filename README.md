@@ -62,6 +62,19 @@ $data = $db->getRows('users');
 // Example: Retrieve users with a specific condition
 $condition = ['where' => ['status' => 1]];
 $data = $db->getRows('users', $condition);
+
+// Example: Retrieve all posts by a user
+$conditions = [
+    'select' => 'users.*, posts.*',
+    'join_type' => [
+        'type' => 'inner',
+        'table' => 'posts',
+        'condition' => 'users.id = posts.user_id'
+    ],
+    'where' => ['users.id' => 1],
+    'return_type' => 'all'
+];
+$data = $db->getRows('users', $condition);
 ```
 
 ### Insert
