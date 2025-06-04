@@ -328,7 +328,7 @@ class DB extends DBCONFIG {
             $colvalSet = '';
             $whereSql = '';
             $i = 0;
-            if (!array_key_exists('modified', $data)) {
+            if (array_key_exists('modified', $data)) {
                 $data['modified'] = date("Y-m-d H:i:s");
             }
             foreach ($data as $key => $val) {
