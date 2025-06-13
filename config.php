@@ -105,18 +105,6 @@ class DBCONFIG {
     }
 }
 
-class ErrorHandler {
-    protected function handleError($errno, $error) {
-        if (DEV_MODE) {
-            die("Error: [ " . $errno . " ]: " . $error . ".");
-        } else {
-            // "[ date ] [errno]: error"
-            error_log("[ " . date('m-d-Y H:i:s') . " ] [" . $errno . "] " . $error . PHP_EOL, 3, 'errors/error_log.log');
-            // TODO: Email error messages
-            die("An error occurred. Please try again later.");
-        }
-    }
-}
 
 /**
  * DB Class 
